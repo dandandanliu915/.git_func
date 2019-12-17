@@ -1,0 +1,2 @@
+export config_file_list=`cat ./.config_file_list`
+export critical_branches="master"

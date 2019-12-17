@@ -1,0 +1,386 @@
+. ./.config
+
+function git_log() {
+	git reflog --date=iso
+}
+
+function git_history() {
+	git log "$@"
+}
+
+function git_commit_id() {
+	commit=`[ -n "$1" ] && echo "$1" || echo "HEAD"`
+	git rev-parse $commit
+}
+
+function git_commit_msg() {
+	commit=`[ -n "$1" ] && echo "$1" || echo "HEAD"`
+	git log --format=%B -n 1 $commit
+}
+
+function git_commit_diff() {
+	commit=`[ -n "$1" ] && echo "$1" || echo "HEAD"`
+	git diff "$commit~1" "$commit"
+}
+
+function _git_list() {
+	git diff-tree --name-status -r "$@"
+}
+
+function git_commit_list() { 
+	commit=$1
+	# changed=`git diff --name-only origin/master $(git_branch_name)`
+	branch_status=`git rev-list --left-right --count origin/master...$(git_branch_name)`
+	behind=`echo $branch_status | awk -F " " '{print $1}'`
+	ahead=`echo $branch_status | awk -F " " '{print $2}'`
+	if [[ -n $commit || $ahead -ne 0 ]]
+	then
+		if [[ -z "$commit" && $behind -ne 0 ]]
+		then
+			git pull --rebase
+		fi
+		
+		commit=`[ -n "$commit" ] && echo "$commit" || echo "HEAD"`
+	
+		changed_list=`_git_list "$commit"`
+		wc=$((`echo "$changed_list" | wc -l`-1))
+		echo "-- $wc files in commit: $changed_list "
+	else
+		echo "-- No commit made, check status below: "
+		git status
+		return 1
+	fi
+}
+
+function git_branch_name() {
+	git branch --show-current
+}
+
+function git_branch_suffix() {
+	suffix="$1"
+	git branch -m "$(git_branch_name)-$1"
+}
+
+function __remove_file_from_commit() {
+	if [ $# -ne 1 ]
+	then
+		echo "-- Invalid input"
+		return 1
+	fi
+
+	path=$1
+
+	{ git_commit_list; rc=$?; } | grep $path >> /dev/null
+	if [[ $rc -eq 0 && $? -eq 0 ]]
+	then
+		echo "-- Remove file from current commit: $path"
+		git reset --soft HEAD~1
+		git reset HEAD $path
+		return 0
+	else
+		echo "-- File is not in current commit: $path"
+		return 1
+	fi
+}
+
+function git_remove_restore_recommit() {
+	path="$1"
+	message=`git_commit_msg`
+
+	__remove_file_from_commit "$path"
+	if [[ $? -ne 0 ]]
+	then
+		echo "-- Failed when remove from commit: $path"
+		return 1
+	fi
+
+	if [[ -n $__retain ]]
+	then 
+		echo "-- Save file copy: $path.$USER"
+		cp $path $path.$USER
+	fi
+
+	if [[ -n $__remove_only ]]
+	then
+		echo "-- Save previous commit message to .git/COMMIT_EDITMSG.orig"
+                echo "$message" > $CL_HOME/.git/COMMIT_EDITMSG.orig
+	else
+		echo "-- Restore file: $path"
+                git restore "$path"
+	
+		staged=`git diff --name-only --cached`
+		if [[ -n $staged ]]
+		then
+			echo "-- Reapply commit message ..."
+			git commit -a -m "$message"
+		else
+			echo "-- Nothing to recommit"
+			echo "-- Save message to .git/COMMIT_EDITMSG.orig"
+			echo "$message" > $CL_HOME/.git/COMMIT_EDITMSG.orig
+		fi        
+	fi
+
+	if [[ -n $__retain ]]
+	then 
+		for path in "$@"
+		do
+			echo "-- Retain from file copy: $path.$USER"
+			cp $path.$USER $path
+		done
+	fi
+
+	git_commit_list
+}
+
+function git_remove_only() {
+	export __remove_only="True"
+	git_remove_restore_recommit "$@"
+	unset __remove_only
+}
+
+function git_remove_retain_recommit() {
+	export __retain="True"
+	git_remove_restore_recommit "$@"
+	unset __retain
+}
+
+function git_branch_reset() {
+	while true; do
+        read -p "This will force current branch to origin/master and abondon all untracked changes. Continue? [y/n] " yn
+		case $yn in
+			[Yy]* ) break;;
+                        [Nn]* ) echo "Canceled"; return;;
+                        * ) echo "Canceled"; return;;
+                esac
+        done
+	git reset --hard origin/master
+}
+
+function __switch_to_standard(){
+	path=$1
+	cp $path $path.$USER
+	git restore $path
+	cp $path $path.orig
+}
+
+function __switch_to_local() {
+        path=$1
+        cp $path $path.orig
+	if [[ -f $path.$USER ]]
+	then
+	        cp $path.$USER $path
+	else
+		echo "User path not exists: $path.$USER"
+	fi
+}
+
+function __config() {
+	echo $config_file_list
+}
+
+function git_config_local() {
+	files=`__config`
+	for file in $files
+        do
+                __switch_to_local $file
+        done
+}
+
+function git_config_standard() {
+	files=`__config`
+        for file in $files
+        do
+		__switch_to_standard $file
+        done
+}
+
+function git_branch_switch() {
+	if [ $# -ne 1 ]
+        then
+                echo "Invalid input"
+                return 1
+        fi
+
+	branch=$1
+
+	files=`__config`
+	for file in $files
+	do
+		check=`git diff --name-only HEAD~1 HEAD | grep "$file"`
+		if [[ -n $check ]]
+		then
+			__switch_to_standard $file
+		fi
+	done
+
+	git switch $branch
+}
+
+function git_show_ones_commits() {
+	if [[ $# -gt 1 ]]
+	then
+		echo "Function doesn't work with spaces in author name"
+		return
+	fi
+	user="$1"
+	if [[ -z $user ]]
+	then
+		user=$USER
+	fi
+	regex="^((?!"$user").*)$"
+	git --no-pager log --author="$user"
+	git --no-pager log --perl-regexp --author='$regex' --committer='$user'
+}
+
+function git_where_are_the_commits() {
+	# Default values
+	commits=""
+	num=""
+	start=""
+	end=""
+	to_grep=$critical_branches
+	verbose=false
+	all=false
+
+	# Get arguments
+	while [[ $# -gt 0 ]]
+	do
+	key="$1"
+
+	case $key in
+		-c|--commit)
+		commits="$commits$2 "
+		shift
+		shift
+		;;
+		-n|--num)
+		num="$2"
+		shift
+		shift
+		;;
+		-s|--start)
+		start="$2"
+		shift
+		shift
+		;;
+		-e|--end)
+		end="$2"
+		shift
+		shift
+		;;
+		-v|--verbose)
+		verbose=true
+		shift
+		;;
+		-a|--all)
+		all=true
+		shift
+		;;
+		*)
+		echo "Invalid input: $1"
+		return
+		;;
+	esac
+	done
+	
+	# Validate input commits and num
+	if [[ -n $commits && -n $num ]]
+	then
+		echo "Invalid input: Input only commits or num"
+		return
+	fi
+
+	# Validate input start and end date
+	if ! date -d "$start" >>/dev/null 2>&1
+	then
+		echo "Invalid input: Start date has to be in format: yyyy-mm-dd"
+		return
+	elif ! date -d "$end" >>/dev/null 2>&1
+	then
+		echo "Invalid input: End date has to be in format: yyyy-mm-dd"
+		return
+	fi
+
+	# Check if critical branches exist
+	if $verbose
+	then
+		to_grep='.*'
+	else
+		echo "Check if critical branches $to_grep exist..."
+		for b in `echo $to_grep | tr "|" "\n"`
+		do
+			temp=`git ls-remote --exit-code --heads origin $b`
+			if [[ -z $temp ]]
+			then
+				echo "Branch origin/$b does not exist now! Check later"
+				return
+			fi
+		done
+		echo "Critical branches exist"
+		echo
+	fi
+	
+	# Get commits ref list (unless specific commits was input)
+	if [[ -z $commits ]]
+	then
+		commits=`git_show_ones_commits | grep commit | awk -F " " '{print $2}'`
+		if [[ -n $num ]]
+		then
+			commits=`echo $commits | tr " " "\n" | head -$num`
+		fi
+	fi
+
+	# Update commit list that not in production yet (unless all flag was input)
+	if $all
+	then
+		echo "-- Get all my commits ..."
+		commits_updated=$commits
+	else
+		echo "-- Get commits not in production yet ..."
+		commits_updated=""
+		for commit in $commits
+		do
+			temp=`git branch -r --contains $commit | grep "wishpost_production"`
+			if [[ -z $temp ]]
+			then
+				commits_updated="$commits_updated$commit "
+			fi
+		done
+	fi
+	commits=$commits_updated
+	
+	# Update commit list between start and end date
+	if [[ -z $start && -z $end ]]
+        then
+		echo "-- Checking all dates..."
+		commits_updated=$commits
+	else
+                echo "-- Looking for commits between ("`[[ -n $start ]] && echo "$start" || echo "-"`", "`[[ -n $end ]] && echo "$end" || echo "-"`")"
+		commits_updated=""
+		for commit in $commits
+		do
+			temp=`git show $commit --no-patch --no-notes --pretty='%ci'`
+			if [[ -z $start || "$temp" > "$start" ]] && [[ -z $end || "$temp" < "$end" ]]
+			then
+				commits_updated="$commits_updated$commit "
+			fi
+		done
+	fi
+	commits=$commits_updated
+
+	# Get each commit info
+	if [[ -z $commits ]]
+	then
+		echo "No commits found"
+		return
+	fi
+	echo "Commit info: "
+	for commit in $commits
+	do	
+		git show $commit --oneline --no-patch 
+		echo "Authored at:  "`git show $commit --no-patch --no-notes --pretty='%ad'`
+		echo "Committed at: "`git show $commit --no-patch --no-notes --pretty='%cd'`
+		echo "Remote branches: "
+		git branch -r --contains $commit | sort | grep -E "origin/($to_grep)"
+	done
+}
