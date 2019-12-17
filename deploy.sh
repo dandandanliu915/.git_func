@@ -26,9 +26,9 @@ if [[ $? -ne 0 ]]
 then
 	cat << EOF >> $HOME/.bashrc
 ## Add customized git functions
-source ~/.git_func/git_func
+source $DIR/git_func
 function git_help() {
-	grep "function git_" ~/.git_func/git_func | awk -F " " '{print \$2}' | awk -F "(" '{print \$1}' | sort
+	grep "function git_" $DIR/git_func | awk -F " " '{print \$2}' | awk -F "(" '{print \$1}' | sort
 }
 EOF
 fi
