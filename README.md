@@ -1,4 +1,4 @@
-# git_func
+# .git_func
 Common bash functions to simplify git operations.
 - cd $HOME
 - git clone git@github.com:dandandanliu915/.git_func.git
