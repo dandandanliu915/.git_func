@@ -1,7 +1,7 @@
 # .git_func
 Common bash functions to simplify git operations.
 - cd $HOME
-- git clone git@github.com:dandandanliu915/.git_func.git
+- git clone https://github.com/dandandanliu915/.git_func.git
 - cd .git_func
 - bash deploy.sh
 
