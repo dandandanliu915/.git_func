@@ -230,7 +230,7 @@ function git_show_ones_commits() {
 	fi
 	regex="^((?!"$user").*)$"
 	git --no-pager log --author="$user"
-	git --no-pager log --perl-regexp --author='$regex' --committer='$user'
+	git --no-pager log --perl-regexp --author="$regex" --committer="$user"
 }
 
 function git_where_are_the_commits() {
