@@ -1,3 +1,3 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-export config_file_list=`cat $DIR/.config_file_list`
-export critical_branches="master"
+export CONFIG_FILE_LIST=`cat $DIR/.config_file_list`
+export CRITICAL_BRANCHES="master"

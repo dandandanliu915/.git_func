@@ -57,9 +57,77 @@ function git_branch_name() {
 	git branch --show-current
 }
 
+function git_branch_ts() {
+	git reflog show --date=format:'%Y-%m-%d %H:%M:%S' --all | sed 's!^.*refs/!refs/!' | grep 'branch:'
+}
+
 function git_branch_suffix() {
 	suffix="$1"
 	git branch -m "$(git_branch_name)-$1"
+}
+
+function git_branch_set_upstream() {
+	remote=`[ -n "$1" ] && echo "$1" || echo "origin/master"`
+	git branch --set-upstream-to "$remote"
+}
+
+function git_branch_remote_exists() {
+	temp=`git ls-remote --exit-code --heads origin $1`
+	if [[ -z $temp ]]
+	then
+		echo "-- Branch origin/$1 does not exist now! Check later"
+		return 1
+	fi
+}
+
+function git_cherry_pick() {
+	read -p "-- Input remote branch name to cherry-pick: " branch
+	git_branch_remote_exists $branch
+	if [[ $? -ne 0 ]]
+	then
+		return 1
+	else
+		echo "-- Checking out remote branch to local"
+		git checkout -B "$branch" "origin/$branch"
+		if [[ $? -ne 0 ]]
+		then
+			echo "-- Cheking out branch failed"
+			return 1
+		fi
+	fi
+	
+	read -p "-- Input commit to be cherry-pick: " commit_id
+	git rev-parse --verify $commit_id 
+	if [[ $? -ne 0 ]]
+        then
+                echo "-- Failed to find commit: $commit_id"
+                return 1
+        fi	
+	echo "-- Here is a brief of input commit: "
+	git_commit_msg $commit_id
+	git_commit_list $commit_id
+	read -p "-- Continue? [Y/n] " yn
+	case $yn in
+            [Yy]* ) echo "-- Cherry picking $commit_id";;
+            [Nn]* ) echo "Canceled"; return 1;;
+            * ) echo "Canceled"; return 1;;
+        esac
+	git cherry-pick "$commit_id"
+	if [[ $? -ne 0 ]]
+        then
+                echo "-- Cherry pick failed"
+                return 1
+        fi
+
+	echo "-- Pushing to remote branch: $branch"
+	git push origin "$branch:$branch"
+	if [[ $? -ne 0 ]]
+        then
+                echo "-- Pushing failed"
+                return 1
+        fi
+
+	echo "Finished"
 }
 
 function __remove_file_from_commit() {
@@ -176,7 +244,7 @@ function __switch_to_local() {
 }
 
 function __config() {
-	echo $config_file_list
+	echo $CONFIG_FILE_LIST
 }
 
 function git_config_local() {
@@ -239,7 +307,7 @@ function git_where_are_the_commits() {
 	num=""
 	start=""
 	end=""
-	to_grep=$critical_branches
+	to_grep=$CRITICAL_BRANCHES
 	verbose=false
 	all=false
 
@@ -310,10 +378,9 @@ function git_where_are_the_commits() {
 		echo "Check if critical branches $to_grep exist..."
 		for b in `echo $to_grep | tr "|" "\n"`
 		do
-			temp=`git ls-remote --exit-code --heads origin $b`
-			if [[ -z $temp ]]
+			git_branch_remote_exists "$b"
+			if [[ $? -ne 0 ]]
 			then
-				echo "Branch origin/$b does not exist now! Check later"
 				return
 			fi
 		done
