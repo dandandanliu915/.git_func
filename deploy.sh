@@ -1,5 +1,7 @@
 #!/bin/bash
 
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
 grep "git_func" $HOME/.bashrc > /dev/null 2>&1
 
 if [[ $? -ne 0 ]]
@@ -19,8 +21,6 @@ else
             * ) echo "Canceled"; exit;;
         esac
 fi
-
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 touch $DIR/.config_file_list
 cp $DIR/git_func_config $DIR/.config
