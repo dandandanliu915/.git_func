@@ -10,17 +10,17 @@ function git_history() {
 }
 
 function git_commit_id() {
-	commit=`[ -n "$1" ] && echo "$1" || echo "HEAD"`
+	commit=`[[ -n "$1" ]] && echo "$1" || echo "HEAD"`
 	git rev-parse $commit
 }
 
 function git_commit_msg() {
-	commit=`[ -n "$1" ] && echo "$1" || echo "HEAD"`
+	commit=`[[ -n "$1" ]] && echo "$1" || echo "HEAD"`
 	git log --format=%B -n 1 $commit
 }
 
 function git_commit_diff() {
-	commit=`[ -n "$1" ] && echo "$1" || echo "HEAD"`
+	commit=`[[ -n "$1" ]] && echo "$1" || echo "HEAD"`
 	git diff "$commit~1" "$commit"
 }
 
@@ -41,7 +41,7 @@ function git_commit_list() {
 			git pull --rebase
 		fi
 		
-		commit=`[ -n "$commit" ] && echo "$commit" || echo "HEAD"`
+		commit=`[[ -n "$commit" ]] && echo "$commit" || echo "HEAD"`
 	
 		changed_list=`_git_list "$commit"`
 		wc=$((`echo "$changed_list" | wc -l`-1))
@@ -57,42 +57,125 @@ function git_branch_name() {
 	git branch --show-current
 }
 
+function git_branch_name_short() {
+	git_branch_name | awk -F "." '{print $1}'
+}
+
 function git_branch_ts() {
 	git reflog show --date=format:'%Y-%m-%d %H:%M:%S' --all | sed 's!^.*refs/!refs/!' | grep 'branch:'
 }
 
 function git_branch_suffix() {
 	suffix="$1"
-	git branch -m "$(git_branch_name)-$1"
+	git branch -m "$(git_branch_name).$1"
 }
 
-function git_branch_set_upstream() {
-	remote=`[ -n "$1" ] && echo "$1" || echo "origin/master"`
+function git_branch_upstream_set() {
+	remote=`[[ -n "$1" ]] && echo "$1" || echo "origin/master"`
 	git branch --set-upstream-to "$remote"
+}
+
+function git_branch_upstream_show() {
+	#git status -sb  | grep -E "^#" | awk -F " " '{print $2}' | awk -F "." '{print $NF}'
+	git rev-parse --abbrev-ref --symbolic-full-name `git_branch_name`@{upstream}
+}
+
+function git_branch_push() {
+	git_branch_name_short | grep master > /dev/null
+	if [[ $? -eq 0 ]]
+	then
+		echo "Pushing master is not recommended"
+		return 1
+	elif [[ -n $(git_branch_upstream_show 2>/dev/null) ]]
+	then 
+		if [[ "$(git_branch_upstream_show)" != "origin/$(git_branch_name_short)" ]]
+		then
+			echo "Upstream remote branch exists and not matching: $(git_branch_upstream_show)"
+			return 1
+		fi
+	fi
+
+	git push -u origin `git_branch_name`:`git_branch_name_short`
 }
 
 function git_branch_remote_exists() {
 	temp=`git ls-remote --exit-code --heads origin $1`
 	if [[ -z $temp ]]
 	then
-		echo "-- Branch origin/$1 does not exist now! Check later"
+		echo "-- Branch origin/$1 does not exist now! Check again"
 		return 1
 	fi
 }
 
+function __hub_exists() {
+	temp=`which hub`
+	if [[ -z $temp ]]
+	then
+		echo "'hub' is not installed yet!"
+		return 1
+	fi
+}
+
+function git_branch_pr() {
+	__hub_exists
+	if [[ $? -ne 0 ]]
+	then
+		return 1
+	fi
+	hub pr list -s all -f "%I|%au|%S|%pS|%t|%U%n" -h "$branch" 
+}
+
+function git_pr_list() {
+	__hub_exists
+	if [ $? -ne 0 ]
+        then
+                return 1
+        fi
+
+	user="$1"
+        if [[ -z $user ]]
+        then
+                user=`[[ -n $(git config user.name) ]] && echo $(git config user.name) || echo $USER`
+        fi
+        regex="^((?!"$user").*)$"
+
+	hub pr list -s all -f "%I|%au|%S|%pS|%t|%U%n" | grep -E "$regex"
+}
+
 function git_cherry_pick() {
+	function _safe_exit(){
+		echo "\nSafe Exited: $1"
+		if [[ -n $branch ]]
+		then
+			git branch | grep $branch > /dev/null
+			if [[ $? -eq 0 ]]
+			then 
+				echo "-- Removing branch and return to original branch"
+				git switch -
+				git branch -d "$branch"
+			fi
+		fi
+		trap - INT TERM EXIT
+	}
+	function _trap() {
+		for sig ; do
+			trap "_safe_exit $sig; return 1" "$sig"
+		done
+	}
+	_trap INT TERM EXIT
+	
 	read -p "-- Input remote branch name to cherry-pick: " branch
 	git_branch_remote_exists $branch
 	if [[ $? -ne 0 ]]
 	then
-		return 1
+		_safe_exit "ERROR"; return
 	else
 		echo "-- Checking out remote branch to local"
 		git checkout -B "$branch" "origin/$branch"
 		if [[ $? -ne 0 ]]
 		then
 			echo "-- Cheking out branch failed"
-			return 1
+			_safe_exit "ERROR"; return
 		fi
 	fi
 	
@@ -101,7 +184,7 @@ function git_cherry_pick() {
 	if [[ $? -ne 0 ]]
         then
                 echo "-- Failed to find commit: $commit_id"
-                return 1
+                _safe_exit "ERROR"; return
         fi	
 	echo "-- Here is a brief of input commit: "
 	git_commit_msg $commit_id
@@ -109,14 +192,13 @@ function git_cherry_pick() {
 	read -p "-- Continue? [Y/n] " yn
 	case $yn in
             [Yy]* ) echo "-- Cherry picking $commit_id";;
-            [Nn]* ) echo "Canceled"; return 1;;
-            * ) echo "Canceled"; return 1;;
+            * ) echo "Canceled"; _safe_exit "CANCELED"; return;;
         esac
 	git cherry-pick "$commit_id"
 	if [[ $? -ne 0 ]]
         then
                 echo "-- Cherry pick failed"
-                return 1
+                _safe_exit "ERROR"; return
         fi
 
 	echo "-- Pushing to remote branch: $branch"
@@ -124,14 +206,14 @@ function git_cherry_pick() {
 	if [[ $? -ne 0 ]]
         then
                 echo "-- Pushing failed"
-                return 1
+                _safe_exit "ERROR"; return
         fi
-
-	echo "Finished"
+	
+	safe_exit "FINISHED"; return
 }
 
 function __remove_file_from_commit() {
-	if [ $# -ne 1 ]
+	if [[ $# -ne 1 ]]
 	then
 		echo "-- Invalid input"
 		return 1
@@ -294,7 +376,7 @@ function git_show_ones_commits() {
 	user="$1"
 	if [[ -z $user ]]
 	then
-		user=$USER
+		user=`[[ -n $(git config user.name) ]] && echo $(git config user.name) || echo $USER`
 	fi
 	regex="^((?!"$user").*)$"
 	git --no-pager log --author="$user"
