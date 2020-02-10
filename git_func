@@ -81,18 +81,39 @@ function git_branch_remote_exists() {
 }
 
 function git_cherry_pick() {
+	function _safe_exit(){
+		echo "\nSafe Exited: $1"
+		if [[ -n $branch ]]
+		then
+			git branch | grep $branch > /dev/null
+			if [[ $? -eq 0 ]]
+			then 
+				echo "-- Removing branch and return to original branch"
+				git switch -
+				git branch -d "$branch"
+			fi
+		fi
+		trap - INT TERM EXIT
+	}
+	function _trap() {
+		for sig ; do
+			trap "_safe_exit $sig; return 1" "$sig"
+		done
+	}
+	_trap INT TERM EXIT
+	
 	read -p "-- Input remote branch name to cherry-pick: " branch
 	git_branch_remote_exists $branch
 	if [[ $? -ne 0 ]]
 	then
-		return 1
+		_safe_exit "ERROR"; return
 	else
 		echo "-- Checking out remote branch to local"
 		git checkout -B "$branch" "origin/$branch"
 		if [[ $? -ne 0 ]]
 		then
 			echo "-- Cheking out branch failed"
-			return 1
+			_safe_exit "ERROR"; return
 		fi
 	fi
 	
@@ -101,7 +122,7 @@ function git_cherry_pick() {
 	if [[ $? -ne 0 ]]
         then
                 echo "-- Failed to find commit: $commit_id"
-                return 1
+                _safe_exit "ERROR"; return
         fi	
 	echo "-- Here is a brief of input commit: "
 	git_commit_msg $commit_id
@@ -109,14 +130,13 @@ function git_cherry_pick() {
 	read -p "-- Continue? [Y/n] " yn
 	case $yn in
             [Yy]* ) echo "-- Cherry picking $commit_id";;
-            [Nn]* ) echo "Canceled"; return 1;;
-            * ) echo "Canceled"; return 1;;
+            * ) echo "Canceled"; _safe_exit "CANCELED"; return;;
         esac
 	git cherry-pick "$commit_id"
 	if [[ $? -ne 0 ]]
         then
                 echo "-- Cherry pick failed"
-                return 1
+                _safe_exit "ERROR"; return
         fi
 
 	echo "-- Pushing to remote branch: $branch"
@@ -124,10 +144,10 @@ function git_cherry_pick() {
 	if [[ $? -ne 0 ]]
         then
                 echo "-- Pushing failed"
-                return 1
+                _safe_exit "ERROR"; return
         fi
-
-	echo "Finished"
+	
+	safe_exit "FINISHED"; return
 }
 
 function __remove_file_from_commit() {
