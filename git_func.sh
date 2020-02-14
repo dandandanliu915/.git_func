@@ -11,12 +11,17 @@ function git_history() {
 
 function git_commit_id() {
 	commit=`[[ -n "$1" ]] && echo "$1" || echo "HEAD"`
-	git rev-parse $commit
+	git rev-parse "$commit"
+}
+
+function git_commit_show() {
+	commit=`[[ -n "$1" ]] && echo "$1" || echo "HEAD"`
+	git show --no-patch "$commit"
 }
 
 function git_commit_msg() {
 	commit=`[[ -n "$1" ]] && echo "$1" || echo "HEAD"`
-	git log --format=%B -n 1 $commit
+	git log --format="%B" -n 1 "$commit"
 }
 
 function git_commit_diff() {
@@ -32,17 +37,17 @@ function git_commit_list() {
 	commit=$1
 	# changed=`git diff --name-only origin/master $(git_branch_name)`
 	branch_status=`git rev-list --left-right --count origin/master...$(git_branch_name)`
-	behind=`echo $branch_status | awk -F " " '{print $1}'`
-	ahead=`echo $branch_status | awk -F " " '{print $2}'`
-	if [[ -n $commit || $ahead -ne 0 ]]
+	behind=`echo "$branch_status" | awk -F " " '{print $1}'`
+	ahead=`echo "$branch_status" | awk -F " " '{print $2}'`
+	if [[ -n "$commit" || "$ahead" -ne 0 ]]
 	then
-		if [[ -z "$commit" && $behind -ne 0 ]]
+		if [[ -z "$commit" && "$behind" -ne 0 ]]
 		then
 			git pull --rebase
 		fi
-		
+
 		commit=`[[ -n "$commit" ]] && echo "$commit" || echo "HEAD"`
-	
+
 		changed_list=`_git_list "$commit"`
 		wc=$((`echo "$changed_list" | wc -l`-1))
 		echo "-- $wc files in commit: $changed_list "
@@ -62,7 +67,7 @@ function git_branch_name_short() {
 }
 
 function git_branch_ts() {
-	git reflog show --date=format:'%Y-%m-%d %H:%M:%S' --all | sed 's!^.*refs/!refs/!' | grep 'branch:'
+	git reflog show --date=format:'%Y-%m-%d %H:%M:%S' --all | sed "s!^.*refs/!refs/!" | grep "branch:"
 }
 
 function git_branch_suffix() {
@@ -99,8 +104,8 @@ function git_branch_push() {
 }
 
 function git_branch_remote_exists() {
-	temp=`git ls-remote --exit-code --heads origin $1`
-	if [[ -z $temp ]]
+	temp=`git ls-remote --exit-code --heads origin "$1"`
+	if [[ -z "$temp" ]]
 	then
 		echo "-- Branch origin/$1 does not exist now! Check again"
 		return 1
@@ -109,7 +114,7 @@ function git_branch_remote_exists() {
 
 function __hub_exists() {
 	temp=`which hub`
-	if [[ -z $temp ]]
+	if [[ -z "$temp" ]]
 	then
 		echo "'hub' is not installed yet!"
 		return 1
@@ -148,7 +153,7 @@ function git_cherry_pick() {
 		then
 			git branch | grep $branch > /dev/null
 			if [[ $? -eq 0 ]]
-			then 
+			then
 				echo "-- Removing branch and return to original branch"
 				git switch -
 				git branch -d "$branch"
@@ -162,7 +167,7 @@ function git_cherry_pick() {
 		done
 	}
 	_trap INT TERM EXIT
-	
+
 	read -p "-- Input remote branch name to cherry-pick: " branch
 	git_branch_remote_exists $branch
 	if [[ $? -ne 0 ]]
@@ -177,14 +182,14 @@ function git_cherry_pick() {
 			_safe_exit "ERROR"; return
 		fi
 	fi
-	
+
 	read -p "-- Input commit to be cherry-pick: " commit_id
 	git rev-parse --verify $commit_id 
 	if [[ $? -ne 0 ]]
         then
                 echo "-- Failed to find commit: $commit_id"
                 _safe_exit "ERROR"; return
-        fi	
+        fi
 	echo "-- Here is a brief of input commit: "
 	git_commit_msg $commit_id
 	git_commit_list $commit_id
@@ -207,7 +212,7 @@ function git_cherry_pick() {
                 echo "-- Pushing failed"
                 _safe_exit "ERROR"; return
         fi
-	
+
 	safe_exit "FINISHED"; return
 }
 
@@ -245,7 +250,7 @@ function git_remove_restore_recommit() {
 	fi
 
 	if [[ -n $__retain ]]
-	then 
+	then
 		echo "-- Save file copy: $path.$USER"
 		cp $path $path.$USER
 	fi
@@ -257,7 +262,7 @@ function git_remove_restore_recommit() {
 	else
 		echo "-- Restore file: $path"
                 git restore "$path"
-	
+
 		staged=`git diff --name-only --cached`
 		if [[ -n $staged ]]
 		then
@@ -267,11 +272,11 @@ function git_remove_restore_recommit() {
 			echo "-- Nothing to recommit"
 			echo "-- Save message to .git/COMMIT_EDITMSG.orig"
 			echo "$message" > $CL_HOME/.git/COMMIT_EDITMSG.orig
-		fi        
+		fi
 	fi
 
 	if [[ -n $__retain ]]
-	then 
+	then
 		for path in "$@"
 		do
 			echo "-- Retain from file copy: $path.$USER"
@@ -432,7 +437,7 @@ function git_where_are_the_commits() {
 		;;
 	esac
 	done
-	
+
 	# Validate input commits and num
 	if [[ -n $commits && -n $num ]]
 	then
@@ -487,7 +492,7 @@ function git_where_are_the_commits() {
 		echo "Critical branches exist"
 		echo
 	fi
-	
+
 	# Get commits ref list (unless specific commits was input)
 	if [[ -z $commits ]]
 	then
@@ -516,7 +521,7 @@ function git_where_are_the_commits() {
 		done
 	fi
 	commits=$commits_updated
-	
+
 	# Update commit list between start and end date
 	if [[ -z $start && -z $end ]]
         then
@@ -544,8 +549,8 @@ function git_where_are_the_commits() {
 	fi
 	echo "Commit info: "
 	for commit in $commits
-	do	
-		git show $commit --oneline --no-patch 
+	do
+		git show $commit --oneline --no-patch
 		echo "Authored at:  "`git show $commit --no-patch --no-notes --pretty='%ad'`
 		echo "Committed at: "`git show $commit --no-patch --no-notes --pretty='%cd'`
 		echo "Remote branches: "
