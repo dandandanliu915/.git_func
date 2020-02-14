@@ -137,8 +137,7 @@ function git_pr_list() {
         then
                 user=`[[ -n $(git config user.name) ]] && echo $(git config user.name) || echo $USER`
         fi
-        regex="^((?!"$user").*)$"
-
+	regex="\|$user.*\|"
 	hub pr list -s all -f "%I|%au|%S|%pS|%t|%U%n" | grep -E "$regex"
 }
 
@@ -442,15 +441,34 @@ function git_where_are_the_commits() {
 	fi
 
 	# Validate input start and end date
-	if ! date -d "$start" >>/dev/null 2>&1
-	then
-		echo "Invalid input: Start date has to be in format: yyyy-mm-dd"
-		return
-	elif ! date -d "$end" >>/dev/null 2>&1
-	then
-		echo "Invalid input: End date has to be in format: yyyy-mm-dd"
-		return
-	fi
+	OS=`uname`
+	case $OS in
+	  'Linux')
+		# Linux
+		if ! date -d "$start" >>/dev/null 2>&1
+		then
+			echo "Invalid input: Start date has to be in format: yyyy-mm-dd"
+			return
+		elif ! date -d "$end" >>/dev/null 2>&1
+		then
+			echo "Invalid input: End date has to be in format: yyyy-mm-dd"
+			return
+		fi
+	  ;;
+	  'Darwin') 
+		# Mac
+		if [[ -n $start ]] && ! date -f "%Y-%m-%d" -j "$start" >/dev/null 2>&1 
+		then
+			echo "Invalid input: Start date has to be in format: yyyy-mm-dd"
+			return
+		elif [[ -n $end ]] && ! date -f "%Y-%m-%d" -j "$end" >>/dev/null 2>&1 
+		then
+			echo "Invalid input: End date has to be in format: yyyy-mm-dd"
+			return
+		fi
+	  ;;
+	  *) ;;
+	esac
 
 	# Check if critical branches exist
 	if $verbose
