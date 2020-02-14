@@ -1,5 +1,5 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-. $DIR/.config
+source $DIR/git_func_helper.sh
 
 function git_log() {
 	git reflog --date=iso
@@ -29,10 +29,6 @@ function git_commit_diff() {
 	git diff "$commit~1" "$commit"
 }
 
-function _git_list() {
-	git diff-tree --name-status -r "$@"
-}
-
 function git_commit_list() { 
 	commit=$1
 	# changed=`git diff --name-only origin/master $(git_branch_name)`
@@ -48,7 +44,7 @@ function git_commit_list() {
 
 		commit=`[[ -n "$commit" ]] && echo "$commit" || echo "HEAD"`
 
-		changed_list=`_git_list "$commit"`
+		changed_list=`__git_list "$commit"`
 		wc=$((`echo "$changed_list" | wc -l`-1))
 		echo "-- $wc files in commit: $changed_list "
 	else
@@ -108,15 +104,6 @@ function git_branch_remote_exists() {
 	if [[ -z "$temp" ]]
 	then
 		echo "-- Branch origin/$1 does not exist now! Check again"
-		return 1
-	fi
-}
-
-function __hub_exists() {
-	temp=`which hub`
-	if [[ -z "$temp" ]]
-	then
-		echo "'hub' is not installed yet!"
 		return 1
 	fi
 }
@@ -216,28 +203,6 @@ function git_cherry_pick() {
 	safe_exit "FINISHED"; return
 }
 
-function __remove_file_from_commit() {
-	if [[ $# -ne 1 ]]
-	then
-		echo "-- Invalid input"
-		return 1
-	fi
-
-	path=$1
-
-	{ git_commit_list; rc=$?; } | grep $path >> /dev/null
-	if [[ $rc -eq 0 && $? -eq 0 ]]
-	then
-		echo "-- Remove file from current commit: $path"
-		git reset --soft HEAD~1
-		git reset HEAD $path
-		return 0
-	else
-		echo "-- File is not in current commit: $path"
-		return 1
-	fi
-}
-
 function git_remove_restore_recommit() {
 	path="$1"
 	message=`git_commit_msg`
@@ -311,28 +276,6 @@ function git_branch_reset() {
 	git reset --hard origin/master
 }
 
-function __switch_to_standard(){
-	path=$1
-	cp $path $path.$USER
-	git restore $path
-	cp $path $path.orig
-}
-
-function __switch_to_local() {
-        path=$1
-        cp $path $path.orig
-	if [[ -f $path.$USER ]]
-	then
-	        cp $path.$USER $path
-	else
-		echo "User path not exists: $path.$USER"
-	fi
-}
-
-function __config() {
-	echo $CONFIG_FILE_LIST
-}
-
 function git_config_local() {
 	files=`__config`
 	for file in $files
@@ -388,6 +331,8 @@ function git_show_ones_commits() {
 }
 
 function git_where_are_the_commits() {
+	__git_func_config
+
 	# Default values
 	commits=""
 	num=""
