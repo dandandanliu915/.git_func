@@ -10,20 +10,19 @@ function git_help() {
         verbose_doc=${help_doc#*Currently includes functions:}
         doc=`echo $verbose_doc | grep -E "^- " | awk -F " " '{print $NF}'`
 
-        if [[ $# -gt 0 ]]
-        then
-        	key="$1"
-
+	if [[ $# -gt 0 ]]
+	then
+	key="$1"
 	        case $key in
-        	        -v|--verbose)
-                	echo "$verbose_doc"
-        	        ;;
-                	*)
+			-v|--verbose)
+			echo "$verbose_doc"
 			;;
-	        esac
+			*)
+			;;
+		esac
 	else
-                echo "$doc"
-        fi
+		echo "$doc"
+	fi
 }
 ## <<< git_func <<<
 EOF
