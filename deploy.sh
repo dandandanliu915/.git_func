@@ -22,22 +22,4 @@ else
         esac
 fi
 
-touch $DIR/.config_file_list
-cp $DIR/git_func_config $DIR/.config
-. $DIR/.config
-
-read -p "Input local config files (space separated): " input_config
-if [[ -n $input_config ]]
-then
-	echo "$input_config" > $DIR/.config_file_list
-fi
-
-read -p "Input critical branch names (space separated): " input_branch
-if [[ -n $input_branch ]]
-then
-	grep -v "CRITICAL_BRANCHES" $DIR/.config > $DIR/.config.temp
-	echo "export CRITICAL_BRANCHES=\"`echo $input_branch | tr ' ' '|' `\"" >> $DIR/.config.temp
-	mv $DIR/.config.temp $DIR/.config
-fi
-
-echo "Deployment finished"
+echo "Global deployment finished. Run git_func_deploy in your git repo to add configuration locally."
