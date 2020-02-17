@@ -58,10 +58,6 @@ function git_branch_name() {
 	git branch --show-current
 }
 
-function git_branch_name_short() {
-	git_branch_name | awk -F "." '{print $1}'
-}
-
 function git_branch_ts() {
 	git reflog show --date=format:'%Y-%m-%d %H:%M:%S' --all | sed "s!^.*refs/!refs/!" | grep "branch:"
 }
@@ -82,21 +78,22 @@ function git_branch_upstream_show() {
 }
 
 function git_branch_push() {
-	git_branch_name_short | grep master > /dev/null
+	git_branch_name_short=`git_branch_name | awk -F "." '{print $1}'`
+	echo $git_branch_name_short| grep master > /dev/null
 	if [[ $? -eq 0 ]]
 	then
 		echo "Pushing master is not recommended"
 		return 1
 	elif [[ -n $(git_branch_upstream_show 2>/dev/null) ]]
-	then 
-		if [[ "$(git_branch_upstream_show)" != "origin/$(git_branch_name_short)" ]]
+	then
+		if [[ "$(git_branch_upstream_show)" != "origin/$git_branch_name_short" ]]
 		then
-			echo "Upstream remote branch exists and not matching: $(git_branch_upstream_show)"
+			echo "Upstream remote branch exists and not matching: $git_branch_upstream_show"
 			return 1
 		fi
 	fi
 
-	git push -u origin `git_branch_name`:`git_branch_name_short`
+	git push -u origin `git_branch_name`:"$git_branch_name_short"
 }
 
 function git_branch_remote_exists() {
@@ -114,7 +111,7 @@ function git_branch_pr() {
 	then
 		return 1
 	fi
-	hub pr list -s all -f "%I|%au|%S|%pS|%t|%U%n" -h "$branch" 
+	hub pr list -s all -f "%I|%au|%S|%pS|%t|%U%n" -h `git_branch_upstream_show`
 }
 
 function git_pr_list() {
@@ -454,12 +451,13 @@ function git_where_are_the_commits() {
 		echo "-- Get all my commits ..."
 		commits_updated=$commits
 	else
-		echo "-- Get commits not in production yet ..."
+		echo "-- Get commits not in all critical branches yet ..."
 		commits_updated=""
+		critical_branch_cnt=`echo $to_grep | tr "|" "\n" | wc -l`
 		for commit in $commits
 		do
-			temp=`git branch -r --contains $commit | grep "wishpost_production"`
-			if [[ -z $temp ]]
+			temp=`git branch -r --contains $commit | grep -v "origin/HEAD" | grep -E "origin/($to_grep)" | wc -l`
+			if [[ $temp -ne $critical_branch_cnt ]]
 			then
 				commits_updated="$commits_updated$commit "
 			fi
