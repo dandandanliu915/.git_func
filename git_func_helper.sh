@@ -19,16 +19,16 @@ function git_func_deploy() {
 		CONFIG=$GIT_DIR/.git_func_config
 
 		touch $FILE_LIST
-		[[ ! -f $CONFIG ]] || cp $DIR/git_func_config $CONFIG
+		[[ -f $CONFIG ]] 2>/dev/null || cp $DIR/git_func_config $CONFIG
 		source $CONFIG
 
 		read -p "Input local config files (space separated OR enter to skip): " input_file_list
 		if [[ -n $input_file_list ]]
 		then
 			echo "$input_config" > $FILE_LIST.temp
-			if [[ -f $FILE_LIST ]] & [[ -s $FILE_LIST ]]
+			if [[ -f $FILE_LIST ]] && [[ -s $FILE_LIST ]]
 			then
-				read -p "Local config files already exist, replace? (Y/n)" yn
+				read -p "Local config files already exist, replace? (Y/n, otherwise concat)" yn
 				case $yn in
                         		[Yy]* )
 						echo "\tReplaced file list"

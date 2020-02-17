@@ -1,12 +1,13 @@
 #!/bin/bash
 
 function deploy() {
-	cat << 'EOF'
+	function command() {
+		cat << 'EOF'
 
 ## >>> git_func >>>
-source $DIR/git_func.sh
+source %s/git_func.sh
 function git_help() {
-        help_doc=`cat $DIR/README.md`
+        help_doc=`cat %s/README.md`
         verbose_doc=${help_doc#*Currently includes functions:}
         doc=`echo $verbose_doc | grep -E "^- " | awk -F " " '{print $NF}'`
 
@@ -26,6 +27,9 @@ function git_help() {
 }
 ## <<< git_func <<<
 EOF
+	}
+	temp=`command`
+	printf "$temp" "$DIR"
 }
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
