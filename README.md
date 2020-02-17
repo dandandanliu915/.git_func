@@ -4,7 +4,9 @@ Common bash functions to simplify git operations.
 - git clone https://github.com/dandandanliu915/.git_func.git
 - cd .git_func
 - bash deploy.sh
-- # cd to your git repo. Run git_func_deploy and follow directions.
+- # cd to your git repo. 
+- . ~/.bashrc
+- git_func_deploy # follow directions.
 
 
 Currently includes functions: 
