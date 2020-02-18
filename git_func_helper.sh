@@ -1,5 +1,3 @@
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-
 function __git_repo_check() {
 	# Check if current directory is a git repo
         [[ -d .git ]] || git rev-parse --git-dir > /dev/null 2>&1
@@ -19,6 +17,7 @@ function git_func_deploy() {
 		CONFIG=$GIT_DIR/.git_func_config
 
 		touch $FILE_LIST
+		DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 		[[ -f $CONFIG ]] 2>/dev/null || cp $DIR/git_func_config $CONFIG
 		source $CONFIG
 
@@ -58,7 +57,7 @@ function git_func_deploy() {
 			then
 				echo "export $var=\"`echo $input_value | tr ' ' '|' `\"" >> $CONFIG.temp
 			else
-				echo "export $var=${!var}" >> $CONFIG.temp
+				echo "export $var=\"${!var}\"" >> $CONFIG.temp
 			fi
 		done
 		mv $CONFIG.temp $CONFIG
@@ -92,7 +91,7 @@ function __git_func_config() {
                 echo "First time deploying for this git repo"
                 git_func_deploy
 	fi
-	source $GIT_DIR/.git_func_config
+	bash $GIT_DIR/.git_func_config
 }
 
 function __git_list() {

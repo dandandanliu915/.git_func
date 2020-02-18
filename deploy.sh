@@ -26,13 +26,13 @@ function git_help() {
 	fi
 }
 ## <<< git_func <<<
+
 EOF
 	}
 	temp=`command`
-	printf "$temp" "$DIR"
+	DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+	printf "$temp" "$DIR" "$DIR"
 }
-
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 grep "git_func" $HOME/.bashrc > /dev/null 2>&1
 
@@ -51,8 +51,8 @@ else
 		orig=`cat $HOME/.bashrc`
 		orig_prev=${orig%\#\# >>> git_func >>>*}
 		orig_tail=${orig#*\#\# <<< git_func <<<}
-		echo "$orig_prev$orig_tail" > $HOME/.bashrc.temp
-		deploy >> $HOME/.bashrc.temp
+		dep=`deploy`
+		echo "$orig_prev$dep$orig_tail" > $HOME/.bashrc.temp
         	cat $HOME/.bashrc.temp | sed '/^$/N;/^\n$/D' > $HOME/.bashrc
         	rm $HOME/.bashrc.temp
 		echo "Global deployment finished."

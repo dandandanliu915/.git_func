@@ -1,5 +1,4 @@
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source $DIR/git_func_helper.sh
+source "$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"/git_func_helper.sh
 
 function git_log() {
 	git reflog --date=iso
@@ -456,7 +455,7 @@ function git_where_are_the_commits() {
 		critical_branch_cnt=`echo $to_grep | tr "|" "\n" | wc -l`
 		for commit in $commits
 		do
-			temp=`git branch -r --contains $commit | grep -v "origin/HEAD" | grep -E "origin/($to_grep)" | wc -l`
+			temp=`git branch -r --contains $commit | grep -E "^  origin/($to_grep)" | wc -l`
 			if [[ $temp -ne $critical_branch_cnt ]]
 			then
 				commits_updated="$commits_updated$commit "
@@ -497,6 +496,6 @@ function git_where_are_the_commits() {
 		echo "Authored at:  "`git show $commit --no-patch --no-notes --pretty='%ad'`
 		echo "Committed at: "`git show $commit --no-patch --no-notes --pretty='%cd'`
 		echo "Remote branches: "
-		git branch -r --contains $commit | sort | grep -E "origin/($to_grep)"
+		git branch -r --contains $commit | sort | grep -E "^  origin/($to_grep)"
 	done
 }
