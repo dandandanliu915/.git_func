@@ -49,15 +49,15 @@ function git_func_deploy() {
 
 		echo "$config_file_header##" > $CONFIG.temp
 
-		vars=`echo $config_file_vars | grep "export" | awk -F "=" '{print $1}' | awk -F " " '{print $NF}'`
+		vars=`echo $config_file_vars | awk -F "=" '{print $1}' | awk -F " " '{print $NF}'`
 		for var in $vars
 		do
 			read -p "Input new value for $var=${!var} (space separated OR enter to skip): " input_value
 			if [[ -n $input_value ]]
 			then
-				echo "export $var=\"`echo $input_value | tr ' ' '|' `\"" >> $CONFIG.temp
+				echo "$var=\"`echo $input_value | tr ' ' '|' `\"" >> $CONFIG.temp
 			else
-				echo "export $var=\"${!var}\"" >> $CONFIG.temp
+				echo "$var=\"${!var}\"" >> $CONFIG.temp
 			fi
 		done
 		mv $CONFIG.temp $CONFIG
@@ -91,7 +91,10 @@ function __git_func_config() {
                 echo "First time deploying for this git repo"
                 git_func_deploy
 	fi
-	bash $GIT_DIR/.git_func_config
+	while read line
+	do
+		eval "$line"
+	done < $GIT_DIR/.git_func_config
 }
 
 function __git_list() {

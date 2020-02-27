@@ -334,7 +334,7 @@ function git_where_are_the_commits() {
 	num=""
 	start=""
 	end=""
-	to_grep=$CRITICAL_BRANCHES
+	to_grep="^  origin/($CRITICAL_BRANCHES)$"
 	verbose=false
 	all=false
 
@@ -401,13 +401,13 @@ function git_where_are_the_commits() {
 			return
 		fi
 	  ;;
-	  'Darwin') 
+	  'Darwin')
 		# Mac
-		if [[ -n $start ]] && ! date -f "%Y-%m-%d" -j "$start" >/dev/null 2>&1 
+		if [[ -n $start ]] && ! date -f "%Y-%m-%d" -j "$start" >>/dev/null 2>&1
 		then
 			echo "Invalid input: Start date has to be in format: yyyy-mm-dd"
 			return
-		elif [[ -n $end ]] && ! date -f "%Y-%m-%d" -j "$end" >>/dev/null 2>&1 
+		elif [[ -n $end ]] && ! date -f "%Y-%m-%d" -j "$end" >>/dev/null 2>&1
 		then
 			echo "Invalid input: End date has to be in format: yyyy-mm-dd"
 			return
@@ -421,8 +421,8 @@ function git_where_are_the_commits() {
 	then
 		to_grep='.*'
 	else
-		echo "Check if critical branches $to_grep exist..."
-		for b in `echo $to_grep | tr "|" "\n"`
+		echo "Check if critical branches $CRITICAL_BRANCHES exist..."
+		for b in `echo $CRITICAL_BRANCHES | tr "|" "\n"`
 		do
 			git_branch_remote_exists "$b"
 			if [[ $? -ne 0 ]]
@@ -455,7 +455,7 @@ function git_where_are_the_commits() {
 		critical_branch_cnt=`echo $to_grep | tr "|" "\n" | wc -l`
 		for commit in $commits
 		do
-			temp=`git branch -r --contains $commit | grep -E "^  origin/($to_grep)" | wc -l`
+			temp=`git branch -r --contains $commit | grep -E "$to_grep" | wc -l`
 			if [[ $temp -ne $critical_branch_cnt ]]
 			then
 				commits_updated="$commits_updated$commit "
@@ -496,6 +496,6 @@ function git_where_are_the_commits() {
 		echo "Authored at:  "`git show $commit --no-patch --no-notes --pretty='%ad'`
 		echo "Committed at: "`git show $commit --no-patch --no-notes --pretty='%cd'`
 		echo "Remote branches: "
-		git branch -r --contains $commit | sort | grep -E "^  origin/($to_grep)"
+		git branch -r --contains $commit | sort | grep -E "$to_grep"
 	done
 }
