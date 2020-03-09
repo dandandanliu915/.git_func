@@ -12,8 +12,10 @@ Common bash functions to simplify git operations.
 Currently includes functions: 
 - git_branch_name 
 	- Show current local branch name.
-- git_branch_pr 
+- git_branch_pr_show
 	- Show pull request related to the remote of local branch.
+- git_branch_pr [-a] [-u user]
+	- Create pull-request for current branch.
 - git_branch_push 
 	- Push current local branch to remote, using the short branch name. Return 1 if failed somehow.
 - git_branch_remote_exists [remote branch name] 

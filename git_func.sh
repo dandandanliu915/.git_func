@@ -28,7 +28,7 @@ function git_commit_diff() {
 	git diff "$commit~1" "$commit"
 }
 
-function git_commit_list() { 
+function git_commit_list() {
 	commit=$1
 	# changed=`git diff --name-only origin/master $(git_branch_name)`
 	branch_status=`git rev-list --left-right --count origin/master...$(git_branch_name)`
@@ -104,13 +104,25 @@ function git_branch_remote_exists() {
 	fi
 }
 
+function git_branch_pr_show() {
+	__hub_exists
+	if [[ $? -ne 0 ]]
+	then
+		return 1
+	fi
+	git_branch_upstream=`git_branch_upstream_show | awk -F "/" '{print $NF}'`
+	hub pr list -f "%I|%au|%rs|%S|%pS|%t|%U%n" --head "$git_branch_upstream" -s all
+}
+
 function git_branch_pr() {
 	__hub_exists
 	if [[ $? -ne 0 ]]
 	then
 		return 1
 	fi
-	hub pr list -s all -f "%I|%au|%S|%pS|%t|%U%n" -h `git_branch_upstream_show`
+	__git_func_config
+	git_branch_upstream=`git_branch_upstream_show | awk -F "/" '{print $NF}'`
+	hub pull-request --push --head "$git_branch_upstream" --reviewer "$REVIEWER" --assign "$ASSIGNEE"
 }
 
 function git_pr_list() {
@@ -120,13 +132,34 @@ function git_pr_list() {
                 return 1
         fi
 
-	user="$1"
+	# Default values
+	user=""
+	all=""
+
+	# Get arguments
+        while [[ $# -gt 0 ]]
+        do
+        key="$1"
+
+        case $key in
+                -u|--user)
+                user="$2"
+                shift
+                shift
+                ;;
+		-a|--all)
+		all="-s all"
+		shift
+		;;
+	esac
+	done
+
         if [[ -z $user ]]
         then
                 user=`[[ -n $(git config user.name) ]] && echo $(git config user.name) || echo $USER`
         fi
 	regex="\|$user.*\|"
-	hub pr list -s all -f "%I|%au|%S|%pS|%t|%U%n" | grep -E "$regex"
+	hub pr list -f "%I|%au|%rs|%S|%pS|%t|%U%n" $all | grep -E "$regex"
 }
 
 function git_cherry_pick() {
@@ -167,7 +200,7 @@ function git_cherry_pick() {
 	fi
 
 	read -p "-- Input commit to be cherry-pick: " commit_id
-	git rev-parse --verify $commit_id 
+	git rev-parse --verify $commit_id
 	if [[ $? -ne 0 ]]
         then
                 echo "-- Failed to find commit: $commit_id"
@@ -273,7 +306,9 @@ function git_branch_reset() {
 }
 
 function git_config_local() {
-	files=`__config`
+	__git_func_config
+
+	files="$CONFIG_FILE_LIST"
 	for file in $files
         do
                 __switch_to_local $file
@@ -281,7 +316,10 @@ function git_config_local() {
 }
 
 function git_config_standard() {
-	files=`__config`
+	__git_func_config
+
+        files="$CONFIG_FILE_LIST"
+
         for file in $files
         do
 		__switch_to_standard $file
@@ -297,7 +335,9 @@ function git_branch_switch() {
 
 	branch=$1
 
-	files=`__config`
+	__git_func_config
+
+        files="$CONFIG_FILE_LIST"
 	for file in $files
 	do
 		check=`git diff --name-only HEAD~1 HEAD | grep "$file"`
@@ -334,7 +374,7 @@ function git_where_are_the_commits() {
 	num=""
 	start=""
 	end=""
-	to_grep="^  origin/($CRITICAL_BRANCHES)$"
+	to_grep=`echo "^  origin/($CRITICAL_BRANCHES)$" | tr "," "|"`
 	verbose=false
 	all=false
 

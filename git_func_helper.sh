@@ -24,7 +24,13 @@ function git_func_deploy() {
 		read -p "Input local config files (space separated OR enter to skip): " input_file_list
 		if [[ -n $input_file_list ]]
 		then
-			echo "$input_config" > $FILE_LIST.temp
+			[[ -f $FILE_LIST.temp ]] && rm $FILE_LIST.temp
+
+			for i in $input_file_list
+			do
+				[[ $i = /* ]] && echo "$i" || echo "$GIT_DIR/../$i" >>  $FILE_LIST.temp
+			done
+
 			if [[ -f $FILE_LIST ]] && [[ -s $FILE_LIST ]]
 			then
 				read -p "Local config files already exist, replace? (Y/n, otherwise concat)" yn
@@ -49,13 +55,13 @@ function git_func_deploy() {
 
 		echo "$config_file_header##" > $CONFIG.temp
 
-		vars=`echo $config_file_vars | awk -F "=" '{print $1}' | awk -F " " '{print $NF}'`
+		vars=`echo "$config_file_vars" | awk -F "=" '{print $1}'`
 		for var in $vars
 		do
 			read -p "Input new value for $var=${!var} (space separated OR enter to skip): " input_value
 			if [[ -n $input_value ]]
 			then
-				echo "$var=\"`echo $input_value | tr ' ' '|' `\"" >> $CONFIG.temp
+				echo "$var=\"`echo $input_value | tr ' ' ',' `\"" >> $CONFIG.temp
 			else
 				echo "$var=\"${!var}\"" >> $CONFIG.temp
 			fi
@@ -133,14 +139,14 @@ function __remove_file_from_commit() {
 }
 
 function __switch_to_standard(){
-	path=$1
+	path="$1"
 	cp $path $path.$USER
 	git restore $path
 	cp $path $path.orig
 }
 
 function __switch_to_local() {
-        path=$1
+        path="$1"
         cp $path $path.orig
 	if [[ -f $path.$USER ]]
 	then

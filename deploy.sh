@@ -9,7 +9,7 @@ source %s/git_func.sh
 function git_help() {
         help_doc=`cat %s/README.md`
         verbose_doc=${help_doc#*Currently includes functions:}
-        doc=`echo $verbose_doc | grep -E "^- " | awk -F " " '{print $NF}'`
+        doc=`echo "$verbose_doc" | grep -E "^- " | awk -F " " '{print $2}'`
 
 	if [[ $# -gt 0 ]]
 	then
