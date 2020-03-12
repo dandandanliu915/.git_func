@@ -10,27 +10,27 @@ Common bash functions to simplify git operations.
 
 
 Currently includes functions: 
-- git_branch_name 
+- git_br_name 
 	- Show current local branch name.
-- git_branch_pr_show
+- git_br_pr_show
 	- Show pull request related to the remote of local branch.
-- git_branch_pr [-a] [-u user]
+- git_br_pr [--all_user] [-au author] [-rs reviewer] [-h head_branch] [-c head_commit] [-s state]
 	- Create pull-request for current branch.
-- git_branch_push 
+- git_br_push 
 	- Push current local branch to remote, using the short branch name. Return 1 if failed somehow.
-- git_branch_remote_exists [remote branch name] 
+- git_br_remote_exists [remote branch name] 
 	- Show if input branch name exists. Return 1 if not.
-- git_branch_reset
+- git_br_reset
 	- Reset current local branch to origin/master HEAD
-- git_branch_suffix [suffix]
+- git_br_suffix [suffix]
 	- Add suffix to current local branch name with "." as separator
-- git_branch_switch [local branch name]
+- git_br_switch [local branch name]
 	- Switch to another local branch while switching all local config files to git version
-- git_branch_ts
+- git_br_ts
 	- Show the timestamp when current local branch was created
-- git_branch_upstream_set [remote branch name]
+- git_br_upstream_set [remote branch name]
 	- Set remote branch to current local branch 
-- git_branch_upstream_show
+- git_br_upstream_show
 	- Show the remote branch name of current local branch
 - git_cherry_pick
 	- Interactively prompt user to assist in performing cherry-pick of a commit to another remote branch in a safe way.

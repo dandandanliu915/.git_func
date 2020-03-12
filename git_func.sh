@@ -30,8 +30,8 @@ function git_commit_diff() {
 
 function git_commit_list() {
 	commit=$1
-	# changed=`git diff --name-only origin/master $(git_branch_name)`
-	branch_status=`git rev-list --left-right --count origin/master...$(git_branch_name)`
+	# changed=`git diff --name-only origin/master $(git_br_name)`
+	branch_status=`git rev-list --left-right --count origin/master...$(git_br_name)`
 	behind=`echo "$branch_status" | awk -F " " '{print $1}'`
 	ahead=`echo "$branch_status" | awk -F " " '{print $2}'`
 	if [[ -n "$commit" || "$ahead" -ne 0 ]]
@@ -53,49 +53,54 @@ function git_commit_list() {
 	fi
 }
 
-function git_branch_name() {
+function git_br_name() {
 	git branch --show-current
 }
 
-function git_branch_ts() {
+function git_br_ts() {
 	git reflog show --date=format:'%Y-%m-%d %H:%M:%S' --all | sed "s!^.*refs/!refs/!" | grep "branch:"
 }
 
-function git_branch_suffix() {
+function git_br_suffix() {
 	suffix="$1"
-	git branch -m "$(git_branch_name).$1"
+	git branch -m "$(git_br_name).$1"
 }
 
-function git_branch_upstream_set() {
+function git_br_upstream_set() {
 	remote=`[[ -n "$1" ]] && echo "$1" || echo "origin/master"`
+	echo $remote | grep -E "^origin/" >/dev/null 2>&1
+	if [[ $? -ne 0 ]]
+	then
+		remote="origin/$remote"
+	fi
 	git branch --set-upstream-to "$remote"
 }
 
-function git_branch_upstream_show() {
+function git_br_upstream_show() {
 	#git status -sb  | grep -E "^#" | awk -F " " '{print $2}' | awk -F "." '{print $NF}'
-	git rev-parse --abbrev-ref --symbolic-full-name `git_branch_name`@{upstream}
+	git rev-parse --abbrev-ref --symbolic-full-name `git_br_name`@{upstream}
 }
 
-function git_branch_push() {
-	git_branch_name_short=`git_branch_name | awk -F "." '{print $1}'`
-	echo $git_branch_name_short| grep master > /dev/null
+function git_br_push() {
+	git_br_name_short=`git_br_name | awk -F "." '{print $1}'`
+	echo $git_br_name_short| grep master > /dev/null
 	if [[ $? -eq 0 ]]
 	then
 		echo "Pushing master is not recommended"
 		return 1
-	elif [[ -n $(git_branch_upstream_show 2>/dev/null) ]]
+	elif [[ -n $(git_br_upstream_show 2>/dev/null) ]]
 	then
-		if [[ "$(git_branch_upstream_show)" != "origin/$git_branch_name_short" ]]
+		if [[ "$(git_br_upstream_show)" != "origin/$git_br_name_short" ]]
 		then
-			echo "Upstream remote branch exists and not matching: $git_branch_upstream_show"
+			echo "Upstream remote branch exists and not matching: $(git_br_upstream_show)"
 			return 1
 		fi
 	fi
 
-	git push -u origin `git_branch_name`:"$git_branch_name_short"
+	git push -u origin `git_br_name`:"$git_br_name_short"
 }
 
-function git_branch_remote_exists() {
+function git_br_remote_exists() {
 	temp=`git ls-remote --exit-code --heads origin "$1"`
 	if [[ -z "$temp" ]]
 	then
@@ -104,25 +109,25 @@ function git_branch_remote_exists() {
 	fi
 }
 
-function git_branch_pr_show() {
+function git_br_pr_show() {
 	__hub_exists
 	if [[ $? -ne 0 ]]
 	then
 		return 1
 	fi
-	git_branch_upstream=`git_branch_upstream_show | awk -F "/" '{print $NF}'`
-	hub pr list -f "%I|%au|%rs|%S|%pS|%t|%U%n" --head "$git_branch_upstream" -s all
+	git_br_upstream=`git_br_upstream_show | awk -F "/" '{print $NF}'`
+	hub pr list -f "|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|title:%t|url:%U%n" --head "$git_br_upstream" -s all
 }
 
-function git_branch_pr() {
+function git_br_pr() {
 	__hub_exists
 	if [[ $? -ne 0 ]]
 	then
 		return 1
 	fi
 	__git_func_config
-	git_branch_upstream=`git_branch_upstream_show | awk -F "/" '{print $NF}'`
-	hub pull-request --push --head "$git_branch_upstream" --reviewer "$REVIEWER" --assign "$ASSIGNEE"
+	git_br_upstream=`git_br_upstream_show | awk -F "/" '{print $NF}'`
+	hub pull-request --push --head "$git_br_upstream" --reviewer "$REVIEWER" --assign "$ASSIGNEE"
 }
 
 function git_pr_list() {
@@ -133,8 +138,14 @@ function git_pr_list() {
         fi
 
 	# Default values
-	user=""
-	all=""
+	pr_number=""
+	author=""
+	reviewer=""
+	head_branch=""
+	head_commit=""
+	state=""
+	all_user=""
+	regex=""
 
 	# Get arguments
         while [[ $# -gt 0 ]]
@@ -142,24 +153,60 @@ function git_pr_list() {
         key="$1"
 
         case $key in
-                -u|--user)
-                user="$2"
+		-pr|--pr_number)
+		pr_number="$2"
+		shift
+		shift
+		;;
+                -au|--author)
+                author="$2"
                 shift
                 shift
                 ;;
-		-a|--all)
-		all="-s all"
+		-rs|--reviewer)
+		reviewer="$2"
 		shift
+		shift
+		;;
+		-h|--head_branch)
+		head_branch="$2"
+		shift
+		shift
+		;;
+		-c|--head_commit)
+		head_commit="$2"
+		shift
+		shift
+		;;
+		-s|--state)
+		state="-s $2"
+		shift
+		shift
+		;;
+		--all_user)
+		all_user="true"
+		shift
+		;;
+		*)
+		echo "Invalid argument: $key"
+		return 1
 		;;
 	esac
 	done
 
-        if [[ -z $user ]]
+        if [[ -z $author ]]
         then
-                user=`[[ -n $(git config user.name) ]] && echo $(git config user.name) || echo $USER`
+                author=`[[ -n $(git config user.name) ]] && echo $(git config user.name) || echo $USER`
         fi
-	regex="\|$user.*\|"
-	hub pr list -f "%I|%au|%rs|%S|%pS|%t|%U%n" $all | grep -E "$regex"
+
+	regex=$regex$([[ -z $all_user ]] && echo " | grep -E \"\|author:[^\|]*$author[^\|]*\|\"" || echo "")
+	regex=$regex$([[ -n $reviewer ]] && echo " | grep -E \"\|reviewers:[^\|]*$reviewer[^\|]*\|\"" || echo "")
+	regex=$regex$([[ -n $pr_number ]] && echo " | grep -E \"\|pr_number:[^\|]*$pr_number[^\|]*\|\"" || echo "")
+	regex=$regex$([[ -n $head_branch ]] && echo " | grep -E \"\|head_branch:[^\|]*$head_branch[^\|]*\|\"" || echo "")
+	regex=$regex$([[ -n $head_commit ]] && echo " | grep -E \"\|head_commit:[^\|]*$head_commit[^\|]*\|\"" || echo "")
+	echo "$regex"
+
+	eval "hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|title:%t|url:%U%n' $state $regex"
 }
 
 function git_cherry_pick() {
@@ -185,7 +232,7 @@ function git_cherry_pick() {
 	_trap INT TERM EXIT
 
 	read -p "-- Input remote branch name to cherry-pick: " branch
-	git_branch_remote_exists $branch
+	git_br_remote_exists $branch
 	if [[ $? -ne 0 ]]
 	then
 		_safe_exit "ERROR"; return
@@ -293,7 +340,7 @@ function git_remove_retain_recommit() {
 	unset __retain
 }
 
-function git_branch_reset() {
+function git_br_reset() {
 	while true; do
         read -p "This will force current branch to origin/master and abondon all untracked changes. Continue? [y/n] " yn
 		case $yn in
@@ -326,7 +373,7 @@ function git_config_standard() {
         done
 }
 
-function git_branch_switch() {
+function git_br_switch() {
 	if [ $# -ne 1 ]
         then
                 echo "Invalid input"
@@ -462,9 +509,9 @@ function git_where_are_the_commits() {
 		to_grep='.*'
 	else
 		echo "Check if critical branches $CRITICAL_BRANCHES exist..."
-		for b in `echo $CRITICAL_BRANCHES | tr "|" "\n"`
+		for b in `echo $CRITICAL_BRANCHES | tr "," "\n"`
 		do
-			git_branch_remote_exists "$b"
+			git_br_remote_exists "$b"
 			if [[ $? -ne 0 ]]
 			then
 				return
