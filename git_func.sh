@@ -127,7 +127,7 @@ function git_br_pr() {
 	fi
 	__git_func_config
 	git_br_upstream=`git_br_upstream_show | awk -F "/" '{print $NF}'`
-	hub pull-request --push --head "$git_br_upstream" --reviewer "$REVIEWER" --assign "$ASSIGNEE"
+	hub pull-request --push --head "$git_br_upstream" --reviewer "$PR_REVIEWER" --assign "$PR_ASSIGNEE" --labels "$PR_LABELS"
 }
 
 function git_pr_list() {
@@ -204,7 +204,7 @@ function git_pr_list() {
 	regex=$regex$([[ -n $pr_number ]] && echo " | grep -E \"\|pr_number:[^\|]*$pr_number[^\|]*\|\"" || echo "")
 	regex=$regex$([[ -n $head_branch ]] && echo " | grep -E \"\|head_branch:[^\|]*$head_branch[^\|]*\|\"" || echo "")
 	regex=$regex$([[ -n $head_commit ]] && echo " | grep -E \"\|head_commit:[^\|]*$head_commit[^\|]*\|\"" || echo "")
-	echo "$regex"
+	#echo "$regex"
 
 	eval "hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|title:%t|url:%U%n' $state $regex"
 }

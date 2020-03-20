@@ -1,5 +1,6 @@
 CONFIG_FILE_LIST=`cat $GIT_DIR/.git_func_config_file_list`
 ##
 CRITICAL_BRANCHES="master"
-REVIEWER=""
-ASSIGNEE=""
+PR_REVIEWER=""
+PR_ASSIGNEE=""
+PR_LABELS=""
