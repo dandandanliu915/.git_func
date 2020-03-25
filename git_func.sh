@@ -143,8 +143,10 @@ function git_pr_list() {
 	reviewer=""
 	head_branch=""
 	head_commit=""
-	state=""
+	merge_commit=""
+	state="open"
 	all_user=""
+	online=""
 	regex=""
 
 	# Get arguments
@@ -168,7 +170,7 @@ function git_pr_list() {
 		shift
 		shift
 		;;
-		-h|--head_branch)
+		-b|--head_branch)
 		head_branch="$2"
 		shift
 		shift
@@ -178,13 +180,29 @@ function git_pr_list() {
 		shift
 		shift
 		;;
+		-m|--merge_commit)
+		merge_commit="$2"
+		shift
+		shift
+		;;
 		-s|--state)
-		state="-s $2"
+		state="$2"
+		case $state in
+			open|closed|merged|all)
+			;;
+			*)
+			echo "Invalid state: $state, must be one of open|closed|merged|all"
+			return 1
+		esac
 		shift
 		shift
 		;;
 		--all_user)
 		all_user="true"
+		shift
+		;;
+		--online)
+		online="true"
 		shift
 		;;
 		*)
@@ -204,9 +222,22 @@ function git_pr_list() {
 	regex=$regex$([[ -n $pr_number ]] && echo " | grep -E \"\|pr_number:[^\|]*$pr_number[^\|]*\|\"" || echo "")
 	regex=$regex$([[ -n $head_branch ]] && echo " | grep -E \"\|head_branch:[^\|]*$head_branch[^\|]*\|\"" || echo "")
 	regex=$regex$([[ -n $head_commit ]] && echo " | grep -E \"\|head_commit:[^\|]*$head_commit[^\|]*\|\"" || echo "")
+	regex=$regex$([[ -n $merge_commit ]] && echo " | grep -E \"\|merge_commit:[^\|]*$merge_commit[^\|]*\|\"" || echo "")
+	regex=$regex$([[ ! $state = "all" ]] && echo " | grep -E \"\|pr_state:[^\|]*$state[^\|]*\|\"" || echo "")
 	#echo "$regex"
 
-	eval "hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|title:%t|url:%U%n' $state $regex"
+	GIT_DIR=`__git_repo_check`
+	PR_LIST=$GIT_DIR/.git_func_config_pr_list
+	if [[ -n $online || ! -e $PR_LIST || ! -f  $PR_LIST ]]
+	then
+		echo "Updating from online ..."
+		hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|title:%t|url:%U%n' -s all > $PR_LIST.temp
+		if [[ $? -eq 0 ]]
+		then
+			mv $PR_LIST.temp $PR_LIST
+		fi
+	fi
+	eval "cat $PR_LIST $regex"
 }
 
 function git_cherry_pick() {
