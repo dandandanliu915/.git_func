@@ -217,7 +217,7 @@ function git_pr_list() {
                 author=`[[ -n $(git config user.name) ]] && echo $(git config user.name) || echo $USER`
         fi
 
-	regex=$regex$([[ -z $all_user ]] && echo " | grep -E \"\|author:[^\|]*$author[^\|]*\|\"" || echo "")
+	regex=$regex$([[ -z $all_user ]] && echo " | grep -iE \"\|author:[^\|]*$author[^\|]*\|\"" || echo "")
 	regex=$regex$([[ -n $reviewer ]] && echo " | grep -E \"\|reviewers:[^\|]*$reviewer[^\|]*\|\"" || echo "")
 	regex=$regex$([[ -n $pr_number ]] && echo " | grep -E \"\|pr_number:[^\|]*$pr_number[^\|]*\|\"" || echo "")
 	regex=$regex$([[ -n $head_branch ]] && echo " | grep -E \"\|head_branch:[^\|]*$head_branch[^\|]*\|\"" || echo "")
@@ -231,7 +231,7 @@ function git_pr_list() {
 	if [[ -n $online || ! -e $PR_LIST || ! -f  $PR_LIST ]]
 	then
 		echo "Updating from online ..."
-		hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|title:%t|url:%U%n' -s all > $PR_LIST.temp
+		hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|created_at:%cI|updated_at:%uI|merged_at:%mI|title:%t|url:%U%n' -s all > $PR_LIST.temp
 		if [[ $? -eq 0 ]]
 		then
 			mv $PR_LIST.temp $PR_LIST
