@@ -14,9 +14,9 @@ Currently includes functions:
 	- Show current local branch name.
 - git_br_pr_show
 	- Show pull request related to the remote of local branch.
-- git_br_pr [--all_user] [-au author] [-rs reviewer] [-h head_branch] [-c head_commit] [-s state]
+- git_br_pr_create 
 	- Create pull-request for current branch.
-- git_br_push 
+- git_br_push
 	- Push current local branch to remote, using the short branch name. Return 1 if failed somehow.
 - git_br_remote_exists [remote branch name] 
 	- Show if input branch name exists. Return 1 if not.
@@ -52,7 +52,7 @@ Currently includes functions:
 	- Show commit summary history
 - git_log
 	- Show local git operation history
-- git_pr_list [user name]
+- git_pr_list [-pr|--pr_number pr_number] [-au|--author author] [-rs|--reviewer reviewer] [-b|--head_branch head_branch] [-c|--head_commit head_commit] [-m|--merge_commit merge_commit] [-s state(open/closed/merged/all)] [--all_user] [--online]
 	- Show current/given user related pull requests
 - git_remove_only [file path]
 	- Remove file from current commit. Revert commit to its previous version
@@ -62,10 +62,10 @@ Currently includes functions:
 	- Remoce file from current commit. Recommit with exactly same commit message. Retain its modified version.
 - git_show_ones_commits [user name]
 	- Show current/given user's authored and committed commit summary history
-- git_where_are_the_commits [-v] [-a] [-c commit id] [-n number] [-s start date] [-e end date]
+- git_where_are_the_commits [-v|--verbose] [-a|--all] [-c|--commit commit_id] [-n|--num number] [-s|--start start date] [-e|--end end date]
 	- Show which branches the current user's commits are pushed
 	- where:
-		- -v|--verbose 	Show all branches. Otherwise show only CRITICAL_BRANCHES (configured for the git repo) when they all exist
+		- -v|--verbose	Show all branches. Otherwise show only CRITICAL_BRANCHES (configured for the git repo) when they all exist
 		- -a|--all	Show all commits. Otherwise show commits not in all CRITICAL_BRANCHES yet
 		- -c|--commit	Check for particular commit id
 		- -n|--num	Check for recent # commits

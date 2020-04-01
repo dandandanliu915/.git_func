@@ -110,32 +110,22 @@ function git_br_remote_exists() {
 }
 
 function git_br_pr_show() {
-	__hub_exists
-	if [[ $? -ne 0 ]]
-	then
-		return 1
-	fi
+	__hub_exists || return 1
+
 	git_br_upstream=`git_br_upstream_show | awk -F "/" '{print $NF}'`
 	hub pr list -f "|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|title:%t|url:%U%n" --head "$git_br_upstream" -s all
 }
 
-function git_br_pr() {
-	__hub_exists
-	if [[ $? -ne 0 ]]
-	then
-		return 1
-	fi
+function git_br_pr_create() {
+	__hub_exists || return 1
+
 	__git_func_config
 	git_br_upstream=`git_br_upstream_show | awk -F "/" '{print $NF}'`
 	hub pull-request --push --head "$git_br_upstream" --reviewer "$PR_REVIEWER" --assign "$PR_ASSIGNEE" --labels "$PR_LABELS"
 }
 
 function git_pr_list() {
-	__hub_exists
-	if [ $? -ne 0 ]
-        then
-                return 1
-        fi
+	__hub_exists || return 1
 
 	# Default values
 	pr_number=""
@@ -165,7 +155,7 @@ function git_pr_list() {
                 shift
                 shift
                 ;;
-		-rs|--reviewer)
+		-rv|--reviewer)
 		reviewer="$2"
 		shift
 		shift
@@ -205,6 +195,10 @@ function git_pr_list() {
 		online="true"
 		shift
 		;;
+		-h|--help)
+		git_help -v | grep "${FUNCNAME[0]}"
+		return
+		;;
 		*)
 		echo "Invalid argument: $key"
 		return 1
@@ -231,13 +225,14 @@ function git_pr_list() {
 	if [[ -n $online || ! -e $PR_LIST || ! -f  $PR_LIST ]]
 	then
 		echo "Updating from online ..."
-		hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|created_at:%cI|updated_at:%uI|merged_at:%mI|title:%t|url:%U%n' -s all > $PR_LIST.temp
+		date +'%Y-%m-%d %H:%M:%S %A' > $PR_LIST.temp
+		hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|created_at:%cI|updated_at:%uI|merged_at:%mI|title:%t|url:%U%n' -s all >> $PR_LIST.temp
 		if [[ $? -eq 0 ]]
 		then
 			mv $PR_LIST.temp $PR_LIST
 		fi
 	fi
-	eval "cat $PR_LIST $regex"
+	eval "head -1 $PR_LIST; cat $PR_LIST $regex"
 }
 
 function git_cherry_pick() {
@@ -307,7 +302,7 @@ function git_cherry_pick() {
                 _safe_exit "ERROR"; return
         fi
 
-	safe_exit "FINISHED"; return
+	_safe_exit "FINISHED"; return
 }
 
 function git_remove_restore_recommit() {
@@ -490,9 +485,13 @@ function git_where_are_the_commits() {
 		all=true
 		shift
 		;;
+		-h|--help)
+                git_help -v | grep "${FUNCNAME[0]}"
+                return
+                ;;
 		*)
 		echo "Invalid input: $1"
-		return
+		return 1
 		;;
 	esac
 	done
