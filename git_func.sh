@@ -77,8 +77,32 @@ function git_br_upstream_set() {
 }
 
 function git_br_upstream_show() {
+	local_branch=`[[ -n "$1" ]] && echo "$1" || git_br_name`
 	#git status -sb  | grep -E "^#" | awk -F " " '{print $2}' | awk -F "." '{print $NF}'
-	git rev-parse --abbrev-ref --symbolic-full-name `git_br_name`@{upstream}
+	eval "git rev-parse --abbrev-ref --symbolic-full-name $local_branch@{upstream} 2>/dev/null"
+}
+
+function git_br_merged_remove() {
+	git switch master; git pull
+	local_branches=`git branch | grep -vE "^\*" |  awk -F " " '{print $1}'`
+	for local_branch in $local_branches
+	do
+		remote_branch=`git_br_upstream_show $local_branch`
+		echo $local_branch $remote_branch
+		if [[ -z $remote_branch ]]
+		then
+			rc=0
+		else
+			git branch -r --merged | grep "$remote_branch" > /dev/null
+			rc=$?
+		fi
+		if [[ $remote_branch = "origin/master" || $rc -eq 0 ]]
+		then
+			continue
+		fi
+		echo "-- Removing $local_branch"
+		git branch -d "$local_branch"
+	done
 }
 
 function git_br_push() {
@@ -201,10 +225,24 @@ function git_pr_list() {
 		;;
 		*)
 		echo "Invalid argument: $key"
+		git_help -v | grep "${FUNCNAME[0]}"
 		return 1
 		;;
 	esac
 	done
+
+	GIT_DIR=`__git_repo_check`
+	PR_LIST=$GIT_DIR/.git_func_config_pr_list
+	if [[ -n $online || ! -e $PR_LIST || ! -f  $PR_LIST ]]
+	then
+		echo "Updating from online ..."
+		date +'%Y-%m-%d %H:%M:%S %A' > $PR_LIST.temp
+		hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|created_at:%cI|updated_at:%uI|merged_at:%mI|title:%t|url:%U%n' -s all >> $PR_LIST.temp
+		if [[ $? -eq 0 ]]
+		then
+			mv $PR_LIST.temp $PR_LIST
+		fi
+	fi
 
         if [[ -z $author ]]
         then
@@ -220,17 +258,25 @@ function git_pr_list() {
 	regex=$regex$([[ ! $state = "all" ]] && echo " | grep -E \"\|pr_state:[^\|]*$state[^\|]*\|\"" || echo "")
 	#echo "$regex"
 
-	GIT_DIR=`__git_repo_check`
-	PR_LIST=$GIT_DIR/.git_func_config_pr_list
-	if [[ -n $online || ! -e $PR_LIST || ! -f  $PR_LIST ]]
+	echo "Searching for criteria: "$([[ -n $pr_number ]] && echo "pr_number: $pr_number, " || echo "")$([[ -n $author ]] && echo "author: $author, " || echo "")$([[ -n $reviewer ]] && echo "reviewer: $reviewer, " || echo "")$([[ -n $head_branch ]] && echo "head_branch: $head_branch, " || echo "")$([[ -n $head_commit ]] && echo "head_commit: $head_commit, " || echo "")$([[ -n $merge_commit ]] && echo "merge_commit: $merge_commit, " || echo "")$([[ -n $state ]] && echo "state: $state, " || echo "")
+
+	line_limit=10
+	line_cnt=`eval "cat $PR_LIST $regex" | wc -l`
+	if [[ $line_cnt -eq 0 ]]
 	then
-		echo "Updating from online ..."
-		date +'%Y-%m-%d %H:%M:%S %A' > $PR_LIST.temp
-		hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|created_at:%cI|updated_at:%uI|merged_at:%mI|title:%t|url:%U%n' -s all >> $PR_LIST.temp
-		if [[ $? -eq 0 ]]
-		then
-			mv $PR_LIST.temp $PR_LIST
-		fi
+		echo "No result found"
+		return
+	elif [[ $line_cnt -gt $line_limit ]]
+	then
+		read -p "Found $line_cnt results, show in console? (Yn)" yn
+		case $yn in
+			Yy) ;;
+			*)
+			echo "Show first $line_limit results ..."
+			eval "head -1 $PR_LIST; cat $PR_LIST $regex | head -$line_limit"
+			return
+			;;
+		esac
 	fi
 	eval "head -1 $PR_LIST; cat $PR_LIST $regex"
 }
@@ -491,6 +537,7 @@ function git_where_are_the_commits() {
                 ;;
 		*)
 		echo "Invalid input: $1"
+		git_help -v | grep "${FUNCNAME[0]}"
 		return 1
 		;;
 	esac

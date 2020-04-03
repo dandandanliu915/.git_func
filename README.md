@@ -10,6 +10,8 @@ Common bash functions to simplify git operations.
 
 
 Currently includes functions: 
+- git_br_merged_remove
+	- Remove merged local branches
 - git_br_name 
 	- Show current local branch name.
 - git_br_pr_show
