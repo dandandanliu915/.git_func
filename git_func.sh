@@ -145,6 +145,8 @@ function git_br_pr_create() {
 
 	__git_func_config
 	git_br_upstream=`git_br_upstream_show | awk -F "/" '{print $NF}'`
+	git_commit_msg
+	read -p "Press any key to continue ..." yn
 	hub pull-request --push --head "$git_br_upstream" --reviewer "$PR_REVIEWER" --assign "$PR_ASSIGNEE" --labels "$PR_LABELS"
 }
 
