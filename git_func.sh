@@ -106,6 +106,13 @@ function git_br_merged_remove() {
 }
 
 function git_br_push() {
+	git cherry -v master
+	read -p "Are you confirmed to push these commits? (Yn) " yn
+        case $yn in
+                [Yy]*) ;;
+                *) echo "Canceled"; return 1 ;;
+        esac
+
 	git_br_name_short=`git_br_name | awk -F "." '{print $1}'`
 	echo $git_br_name_short| grep master > /dev/null
 	if [[ $? -eq 0 ]]
@@ -143,11 +150,21 @@ function git_br_pr_show() {
 function git_br_pr_create() {
 	__hub_exists || return 1
 
-	__git_func_config
+	git cherry -v master
+	read -p "Are you confirmed to pull request these commits? (Yn) " yn
+	case $yn in
+		[Yy]*) ;;
+		*) echo "Canceled"; return 1 ;;
+	esac
+
 	git_br_upstream=`git_br_upstream_show | awk -F "/" '{print $NF}'`
 	git_commit_msg
 	read -p "Press any key to continue ..." yn
+
+	__git_func_config
 	hub pull-request --push --head "$git_br_upstream" --reviewer "$PR_REVIEWER" --assign "$PR_ASSIGNEE" --labels "$PR_LABELS"
+
+	git_pr_list --online
 }
 
 function git_pr_list() {
@@ -272,7 +289,7 @@ function git_pr_list() {
 	then
 		read -p "Found $line_cnt results, show in console? (Yn)" yn
 		case $yn in
-			Yy) ;;
+			[Yy]*) ;;
 			*)
 			echo "Show first $line_limit results ..."
 			eval "head -1 $PR_LIST; cat $PR_LIST $regex | head -$line_limit"
