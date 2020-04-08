@@ -83,25 +83,54 @@ function git_br_upstream_show() {
 }
 
 function git_br_merged_remove() {
-	git switch master; git pull
-	local_branches=`git branch | grep -vE "^\*" |  awk -F " " '{print $1}'`
+	git switch master #; git pull
+	local_branches=`git branch | grep -vE "^\*" | awk -F " " '{print $1}'`
 	for local_branch in $local_branches
 	do
 		remote_branch=`git_br_upstream_show $local_branch`
-		echo $local_branch $remote_branch
+		remote_branch_short=${remote_branch#*origin\/}
+		echo "\n $local_branch $remote_branch"
 		if [[ -z $remote_branch ]]
 		then
-			rc=0
+			echo "-- Skipped: No remote branch created for $local_branch"
+			flag=-1
+		elif [[ $remote_branch = "origin/master" ]]
+		then
+			echo "-- Skipped: Remote branch is origin/master for $local_branch"
+			flag=-1
 		else
-			git branch -r --merged | grep "$remote_branch" > /dev/null
-			rc=$?
+			prs=`git_pr_list -b $remote_branch_short -s merged --quiet`
+			if [[ -z $prs ]]
+			then
+				echo "-- Skipped: No pr merged for $local_branch"
+				flag=-1
+			else
+				flag=0
+				total=`echo "$prs" | wc -l`
+				for pr in "$prs":
+				do
+					pr_merge_commit_id=`echo $pr | tr "|" "\n" | grep merge_commit | awk -F ":" '{print $NF}'`
+					git branch -r --contains $pr_merge_commit_id | grep -E "^ *origin/master$" > /dev/null
+					flag=$((flag+$?))
+				done
+				echo "-- $((total-flag))/$total pr created and merged for $local_branch"
+			fi
+			#git branch -r --merged | grep "$remote_branch" > /dev/null
+			#rc=$?
 		fi
-		if [[ $remote_branch = "origin/master" || $rc -eq 0 ]]
+
+		if [[ $flag -ne 0 ]]
 		then
 			continue
 		fi
+
 		echo "-- Removing $local_branch"
 		git branch -d "$local_branch"
+		if git_br_remote_exists $remote_branch_short > /dev/null
+		then
+			echo "-- Removing $remote_branch"
+			git push origin --delete $remote_branch_short
+		fi
 	done
 }
 
@@ -181,6 +210,7 @@ function git_pr_list() {
 	all_user=""
 	online=""
 	regex=""
+	quiet=""
 
 	# Get arguments
         while [[ $# -gt 0 ]]
@@ -242,6 +272,10 @@ function git_pr_list() {
 		git_help -v | grep "${FUNCNAME[0]}"
 		return
 		;;
+		--quiet)
+		quiet="True"
+		shift
+		;;
 		*)
 		echo "Invalid argument: $key"
 		git_help -v | grep "${FUNCNAME[0]}"
@@ -250,11 +284,15 @@ function git_pr_list() {
 	esac
 	done
 
+	function _print() {
+		[[ -z $quiet ]] && echo $@
+	}
+
 	GIT_DIR=`__git_repo_check`
 	PR_LIST=$GIT_DIR/.git_func_config_pr_list
 	if [[ -n $online || ! -e $PR_LIST || ! -f  $PR_LIST ]]
 	then
-		echo "Updating from online ..."
+		_print "Updating from online ..."
 		date +'%Y-%m-%d %H:%M:%S %A' > $PR_LIST.temp
 		hub pr list -f '|pr_number:%I|author:%au|reviewers:%rs|state:%S|pr_state:%pS|head_branch:%H|head_commit:%sH|merge_commit:%sm|created_at:%cI|updated_at:%uI|merged_at:%mI|title:%t|url:%U%n' -s all >> $PR_LIST.temp
 		if [[ $? -eq 0 ]]
@@ -275,15 +313,15 @@ function git_pr_list() {
 	regex=$regex$([[ -n $head_commit ]] && echo " | grep -E \"\|head_commit:[^\|]*$head_commit[^\|]*\|\"" || echo "")
 	regex=$regex$([[ -n $merge_commit ]] && echo " | grep -E \"\|merge_commit:[^\|]*$merge_commit[^\|]*\|\"" || echo "")
 	regex=$regex$([[ ! $state = "all" ]] && echo " | grep -E \"\|pr_state:[^\|]*$state[^\|]*\|\"" || echo "")
-	#echo "$regex"
+	#_print "$regex"
 
-	echo "Searching for criteria: "$([[ -n $pr_number ]] && echo "pr_number: $pr_number, " || echo "")$([[ -n $author ]] && echo "author: $author, " || echo "")$([[ -n $reviewer ]] && echo "reviewer: $reviewer, " || echo "")$([[ -n $head_branch ]] && echo "head_branch: $head_branch, " || echo "")$([[ -n $head_commit ]] && echo "head_commit: $head_commit, " || echo "")$([[ -n $merge_commit ]] && echo "merge_commit: $merge_commit, " || echo "")$([[ -n $state ]] && echo "state: $state, " || echo "")
+	_print "Searching for criteria: "$([[ -n $pr_number ]] && echo "pr_number: $pr_number, " || echo "")$([[ -n $author ]] && echo "author: $author, " || echo "")$([[ -n $reviewer ]] && echo "reviewer: $reviewer, " || echo "")$([[ -n $head_branch ]] && echo "head_branch: $head_branch, " || echo "")$([[ -n $head_commit ]] && echo "head_commit: $head_commit, " || echo "")$([[ -n $merge_commit ]] && echo "merge_commit: $merge_commit, " || echo "")$([[ -n $state ]] && echo "state: $state, " || echo "")
 
 	line_limit=10
 	line_cnt=`eval "cat $PR_LIST $regex" | wc -l`
 	if [[ $line_cnt -eq 0 ]]
 	then
-		echo "No result found"
+		_print "No result found"
 		return
 	elif [[ $line_cnt -gt $line_limit ]]
 	then
@@ -291,13 +329,14 @@ function git_pr_list() {
 		case $yn in
 			[Yy]*) ;;
 			*)
-			echo "Show first $line_limit results ..."
+			_print "Show first $line_limit results ..."
 			eval "head -1 $PR_LIST; cat $PR_LIST $regex | head -$line_limit"
 			return
 			;;
 		esac
 	fi
-	eval "head -1 $PR_LIST; cat $PR_LIST $regex"
+	_print $(head -1 $PR_LIST)
+	eval "cat $PR_LIST $regex"
 }
 
 function git_cherry_pick() {
