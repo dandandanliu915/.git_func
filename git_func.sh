@@ -83,7 +83,8 @@ function git_br_upstream_show() {
 }
 
 function git_br_merged_remove() {
-	git switch master #; git pull
+	git_pr_list --online
+	git switch master; git pull --quiet
 	local_branches=`git branch | grep -vE "^\*" | awk -F " " '{print $1}'`
 	for local_branch in $local_branches
 	do
