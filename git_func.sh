@@ -8,6 +8,12 @@ function git_history() {
 	git log "$@"
 }
 
+function git_co() {
+	git switch master
+	git pull -q
+	git co -b $1
+}
+
 function git_commit_id() {
 	commit=`[[ -n "$1" ]] && echo "$1" || echo "HEAD"`
 	git rev-parse "$commit"
@@ -36,10 +42,11 @@ function git_commit_list() {
 	ahead=`echo "$branch_status" | awk -F " " '{print $2}'`
 	if [[ -n "$commit" || "$ahead" -ne 0 ]]
 	then
-		if [[ -z "$commit" && "$behind" -ne 0 ]]
-		then
-			git pull --rebase
-		fi
+		#if [[ -z "$commit" && "$behind" -ne 0 ]]
+		#then
+		#	git fetch
+		#	git rebase origin/master
+		#fi
 
 		commit=`[[ -n "$commit" ]] && echo "$commit" || echo "HEAD"`
 
@@ -83,14 +90,26 @@ function git_br_upstream_show() {
 }
 
 function git_br_merged_remove() {
-	git_pr_list --online
 	git switch master; git pull --quiet
+
+	# Update pr list if last update is 5 mins ago
+	GIT_DIR=`__git_repo_check`
+	PR_LIST=$GIT_DIR/.git_func_config_pr_list
+	now=$(date +%s)
+	old=$(head -1 $PR_LIST)
+	old=$(date -d "$old" +%s)
+	if [[ $(( (now-old)/60 )) -gt 5 ]]
+	then
+		git_pr_list --online
+	fi
+
 	local_branches=`git branch | grep -vE "^\*" | awk -F " " '{print $1}'`
 	for local_branch in $local_branches
 	do
 		remote_branch=`git_br_upstream_show $local_branch`
 		remote_branch_short=${remote_branch#*origin\/}
-		echo "\n $local_branch $remote_branch"
+		echo ""
+		echo "$local_branch $remote_branch"
 		if [[ -z $remote_branch ]]
 		then
 			echo "-- Skipped: No remote branch created for $local_branch"
@@ -108,9 +127,8 @@ function git_br_merged_remove() {
 			else
 				flag=0
 				total=`echo "$prs" | wc -l`
-				for pr in "$prs":
+				for pr_merge_commit_id in `echo $prs | tr "|" "\n" | grep merge_commit | awk -F ":" '{print $NF}'`
 				do
-					pr_merge_commit_id=`echo $pr | tr "|" "\n" | grep merge_commit | awk -F ":" '{print $NF}'`
 					git branch -r --contains $pr_merge_commit_id | grep -E "^ *origin/master$" > /dev/null
 					flag=$((flag+$?))
 				done
@@ -130,7 +148,7 @@ function git_br_merged_remove() {
 		if git_br_remote_exists $remote_branch_short > /dev/null
 		then
 			echo "-- Removing $remote_branch"
-			git push origin --delete $remote_branch_short
+			git push origin -d $remote_branch_short
 		fi
 	done
 }
@@ -158,7 +176,7 @@ function git_br_push() {
 		fi
 	fi
 
-	git push -u origin `git_br_name`:"$git_br_name_short"
+	git push -u origin `git_br_name`:"$git_br_name_short" "$@"
 }
 
 function git_br_remote_exists() {
@@ -269,13 +287,13 @@ function git_pr_list() {
 		online="true"
 		shift
 		;;
+                --quiet)
+                quiet="True"
+                shift
+                ;;
 		-h|--help)
 		git_help -v | grep "${FUNCNAME[0]}"
 		return
-		;;
-		--quiet)
-		quiet="True"
-		shift
 		;;
 		*)
 		echo "Invalid argument: $key"
@@ -302,7 +320,7 @@ function git_pr_list() {
 		fi
 	fi
 
-        if [[ -z $author ]]
+        if [[ -z $author && -z $all_user ]]
         then
                 author=`[[ -n $(git config user.name) ]] && echo $(git config user.name) || echo $USER`
         fi
@@ -342,7 +360,8 @@ function git_pr_list() {
 
 function git_cherry_pick() {
 	function _safe_exit(){
-		echo "\nSafe Exited: $1"
+		echo ""
+		echo "Safe Exited: $1"
 		if [[ -n $branch ]]
 		then
 			git branch | grep $branch > /dev/null
@@ -387,7 +406,13 @@ function git_cherry_pick() {
 	echo "-- Here is a brief of input commit: "
 	git_commit_msg $commit_id
 	git_commit_list $commit_id
-	read -p "-- Continue? [Y/n] " yn
+	read -p "-- Check commit diff? [Y/n]" yn
+	case $yn in
+	    [Yy]* ) git_commit_diff $commit_id;;
+	    *) ;;
+	esac
+
+	read -p "-- Continue Cherry-pick? [Y/n] " yn
 	case $yn in
             [Yy]* ) echo "-- Cherry picking $commit_id";;
             * ) echo "Canceled"; _safe_exit "CANCELED"; return;;
@@ -639,6 +664,9 @@ function git_where_are_the_commits() {
 	  *) ;;
 	esac
 
+	# Switch to master branch and refresh repo
+	git switch master; git pull --quiet
+
 	# Check if critical branches exist
 	if $verbose
 	then
@@ -660,7 +688,7 @@ function git_where_are_the_commits() {
 	# Get commits ref list (unless specific commits was input)
 	if [[ -z $commits ]]
 	then
-		commits=`git_show_ones_commits | grep commit | awk -F " " '{print $2}'`
+		commits=`git_show_ones_commits | grep -E "^commit" | awk -F " " '{print $2}'`
 		if [[ -n $num ]]
 		then
 			commits=`echo $commits | tr " " "\n" | head -$num`

@@ -141,8 +141,9 @@ function __remove_file_from_commit() {
 function __switch_to_standard(){
 	path="$1"
 	cp $path $path.$USER
-	git restore $path
-	cp $path $path.orig
+	cp $path.orig $path 
+	#git restore $path
+	#cp $path $path.orig
 }
 
 function __switch_to_local() {
