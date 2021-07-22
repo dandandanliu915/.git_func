@@ -406,7 +406,7 @@ function git_cherry_pick() {
 	echo "-- Here is a brief of input commit: "
 	git_commit_msg $commit_id
 	git_commit_list $commit_id
-	read -p "-- Check commit diff? [Y/n]" yn
+	read -p "-- Check commit diff? [Y/n] " yn
 	case $yn in
 	    [Yy]* ) git_commit_diff $commit_id;;
 	    *) ;;
@@ -565,8 +565,8 @@ function git_show_ones_commits() {
 		user=`[[ -n $(git config user.name) ]] && echo $(git config user.name) || echo $USER`
 	fi
 	regex="^((?!"$user").*)$"
-	git --no-pager log --author="$user"
-	git --no-pager log --perl-regexp --author="$regex" --committer="$user"
+	git --no-pager log --regexp-ignore-case --author="$user"
+	git --no-pager log --regexp-ignore-case --perl-regexp --author="$regex" --committer="$user"
 }
 
 function git_where_are_the_commits() {
