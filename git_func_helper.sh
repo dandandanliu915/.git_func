@@ -18,7 +18,8 @@ function git_func_deploy() {
 
 		touch $FILE_LIST
 		DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-		[[ -f $CONFIG ]] 2>/dev/null || cp $DIR/git_func_config $CONFIG
+		[[ -f $CONFIG ]] 2>/dev/null || cp $CONFIG $CONFIG.bkp
+		cp $DIR/git_func_config $CONFIG
 		source $CONFIG
 
 		read -p "Input local config files (space separated OR enter to skip): " input_file_list
@@ -67,6 +68,7 @@ function git_func_deploy() {
 			fi
 		done
 		mv $CONFIG.temp $CONFIG
+		[[ -f $CONFIG.bkp ]] 2>/dev/null || rm $CONFIG.bkp
 
 		echo "Deployed for $GIT_DIR"
 	}

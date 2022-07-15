@@ -176,7 +176,7 @@ function git_br_push() {
 		fi
 	fi
 
-	git push -u origin `git_br_name`:"$git_br_name_short" "$@"
+	git push -u origin `git_br_name`:"$BR_PREFIX$git_br_name_short" "$@"
 }
 
 function git_br_remote_exists() {
